@@ -1,0 +1,38 @@
+# Levanta PostgreSQL + la API con:  docker compose up --build
+# Los valores por defecto sirven para desarrollo; se pueden sobrescribir con un fichero .env (ver .env.example).
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: incidencias
+      POSTGRES_USER: ${DB_USUARIO:-incidencias}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-incidencias}
+    ports:
+      - "5432:5432"
+    volumes:
+      - datos-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy   # espera a que PostgreSQL acepte conexiones
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/incidencias
+      DB_USUARIO: ${DB_USUARIO:-incidencias}
+      DB_PASSWORD: ${DB_PASSWORD:-incidencias}
+      # Clave solo para desarrollo: en cualquier otro entorno se define en .env
+      JWT_SECRETO: ${JWT_SECRETO:-S8b6RBwcXii4AA+75YFGCWW8jiNAGKEZztrTaUVLpiQ=}
+      JWT_EXPIRACION_MINUTOS: ${JWT_EXPIRACION_MINUTOS:-60}
+      # Carga usuarios e incidencias de ejemplo si la base de datos está vacía
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-demo}
+    ports:
+      - "8080:8080"
+
+volumes:
+  datos-postgres:
