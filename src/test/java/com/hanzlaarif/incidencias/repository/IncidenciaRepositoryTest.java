@@ -36,6 +36,8 @@ class IncidenciaRepositoryTest {
     private IncidenciaRepository incidenciaRepository;
     @Autowired
     private UsuarioRepository usuarioRepository;
+    @Autowired
+    private ComentarioRepository comentarioRepository;
 
     private Usuario ana;
     private Usuario pere;
@@ -43,6 +45,11 @@ class IncidenciaRepositoryTest {
 
     @BeforeEach
     void setUp() {
+        // partir de tablas vacías aunque otra clase de test haya dejado datos (se deshace al acabar el test)
+        comentarioRepository.deleteAllInBatch();
+        incidenciaRepository.deleteAllInBatch();
+        usuarioRepository.deleteAllInBatch();
+
         ana = usuarioRepository.save(new Usuario("Ana", "ana@test.local", "hash", Rol.USUARIO));
         pere = usuarioRepository.save(new Usuario("Pere", "pere@test.local", "hash", Rol.USUARIO));
         tecnico = usuarioRepository.save(new Usuario("Laura", "laura@test.local", "hash", Rol.TECNICO));

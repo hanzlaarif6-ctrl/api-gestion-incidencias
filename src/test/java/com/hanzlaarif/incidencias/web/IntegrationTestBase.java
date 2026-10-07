@@ -7,6 +7,7 @@ import com.hanzlaarif.incidencias.domain.Usuario;
 import com.hanzlaarif.incidencias.repository.ComentarioRepository;
 import com.hanzlaarif.incidencias.repository.IncidenciaRepository;
 import com.hanzlaarif.incidencias.repository.UsuarioRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -46,11 +47,17 @@ abstract class IntegrationTestBase {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    /**
+     * Estos tests confirman sus transacciones, así que los datos quedan en la base de datos H2
+     * compartida. Se vacía antes y después de cada test para no afectar a otras clases de test,
+     * se ejecuten en el orden que se ejecuten.
+     */
     @BeforeEach
+    @AfterEach
     void limpiarBaseDeDatos() {
-        comentarioRepository.deleteAll();
-        incidenciaRepository.deleteAll();
-        usuarioRepository.deleteAll();
+        comentarioRepository.deleteAllInBatch();
+        incidenciaRepository.deleteAllInBatch();
+        usuarioRepository.deleteAllInBatch();
     }
 
     /** Los técnicos no se pueden registrar por la API, así que se crean directamente en la base de datos. */
