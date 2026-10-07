@@ -1,0 +1,12 @@
+# Perfil de tests: H2 en memoria en modo compatible con PostgreSQL.
+# Flyway ejecuta las mismas migraciones que en producción.
+spring:
+  datasource:
+    url: jdbc:h2:mem:incidencias;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+
+app:
+  jwt:
+    secreto: yZMYNw1OcZ4VY+n+H2H/B80FsFhOF9ostJPMVZk9sMs=
+    expiracion-minutos: 60

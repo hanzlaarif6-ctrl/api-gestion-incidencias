@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: api-gestion-incidencias
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/incidencias}
+    username: ${DB_USUARIO:incidencias}
+    password: ${DB_PASSWORD:incidencias}
+
+  jpa:
+    # El esquema lo gestiona Flyway; Hibernate solo comprueba que las entidades coinciden con él
+    hibernate:
+      ddl-auto: validate
+    # Evita consultas lazy desde la capa web: todo se resuelve dentro de las transacciones de servicio
+    open-in-view: false
+
+  flyway:
+    locations: classpath:db/migration
+
+  data:
+    web:
+      pageable:
+        max-page-size: 100
+
+  # Mensajes de validación siempre en castellano
+  web:
+    locale: es
+    locale-resolver: fixed
+
+  jackson:
+    default-property-inclusion: non_null
+
+app:
+  jwt:
+    # Sin valor por defecto a propósito: la aplicación no arranca si no se define JWT_SECRETO
+    secreto: ${JWT_SECRETO:}
+    expiracion-minutos: ${JWT_EXPIRACION_MINUTOS:60}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+# Documentación activada a propósito (proyecto de demostración); en producción se podría desactivar
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+    tags-sorter: alpha
