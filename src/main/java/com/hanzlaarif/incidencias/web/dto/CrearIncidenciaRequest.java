@@ -11,7 +11,7 @@ public record CrearIncidenciaRequest(
         @NotBlank @Size(max = 150) String titulo,
 
         @Schema(example = "Al imprimir aparece el error de papel atascado aunque la bandeja está vacía.")
-        @NotBlank @Size(max = 4000) String descripcion,
+        @NotBlank @Size(max = 1000) String descripcion,
 
         @Schema(example = "MEDIA")
         @NotNull Prioridad prioridad) {

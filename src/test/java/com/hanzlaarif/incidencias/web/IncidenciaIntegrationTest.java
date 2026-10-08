@@ -60,6 +60,46 @@ class IncidenciaIntegrationTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("CRITICA")));
     }
 
+    /**
+     * 1000 caracteres de 2 y 3 bytes en UTF-8 (unos 2500 bytes). En Oracle un VARCHAR2 admite como
+     * máximo 4000 bytes: este test garantiza que el límite de la API cabe en cualquier base de datos.
+     */
+    @Test
+    void descripcionMaximaConCaracteresMultibyteSeGuardaEntera() throws Exception {
+        String descripcion = "ñ€".repeat(500);
+        String respuesta = mockMvc.perform(post("/api/incidencias")
+                        .header(HttpHeaders.AUTHORIZATION, tokenAna)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("titulo", "Año: caracteres àéñç", "descripcion", descripcion,
+                                "prioridad", "MEDIA"))))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long id = leer(respuesta).get("id").asLong();
+
+        mockMvc.perform(get("/api/incidencias/{id}", id).header(HttpHeaders.AUTHORIZATION, tokenAna))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.titulo").value("Año: caracteres àéñç"))
+                .andExpect(jsonPath("$.descripcion").value(descripcion));
+    }
+
+    @Test
+    void descripcionDeMasDe1000CaracteresDevuelve400() throws Exception {
+        mockMvc.perform(post("/api/incidencias")
+                        .header(HttpHeaders.AUTHORIZATION, tokenAna)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("titulo", "Larga", "descripcion", "a".repeat(1001), "prioridad", "BAJA"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errores.descripcion").exists());
+    }
+
+    @Test
+    void comentarioMaximoConCaracteresMultibyteSeGuarda() throws Exception {
+        long id = crearIncidencia(tokenAna, "Sin red", "ALTA");
+
+        comentar(tokenAna, id, "ñ€".repeat(500)).andExpect(status().isCreated());
+        comentar(tokenAna, id, "a".repeat(1001)).andExpect(status().isBadRequest());
+    }
+
     @Test
     void crearSinTituloDevuelve400() throws Exception {
         mockMvc.perform(post("/api/incidencias")

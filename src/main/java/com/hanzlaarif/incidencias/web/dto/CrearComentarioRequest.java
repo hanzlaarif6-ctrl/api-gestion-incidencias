@@ -6,5 +6,5 @@ import jakarta.validation.constraints.Size;
 
 public record CrearComentarioRequest(
         @Schema(example = "He reiniciado la impresora y sigue igual.")
-        @NotBlank @Size(max = 2000) String texto) {
+        @NotBlank @Size(max = 1000) String texto) {
 }

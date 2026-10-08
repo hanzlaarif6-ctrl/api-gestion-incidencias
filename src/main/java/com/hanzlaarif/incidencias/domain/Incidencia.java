@@ -32,7 +32,7 @@ public class Incidencia {
     @Column(nullable = false, length = 150)
     private String titulo;
 
-    @Column(nullable = false, length = 4000)
+    @Column(nullable = false, length = 1000)
     private String descripcion;
 
     @Enumerated(EnumType.STRING)

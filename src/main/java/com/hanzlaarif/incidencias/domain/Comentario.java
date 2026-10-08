@@ -21,7 +21,7 @@ public class Comentario {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 2000)
+    @Column(nullable = false, length = 1000)
     private String texto;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
