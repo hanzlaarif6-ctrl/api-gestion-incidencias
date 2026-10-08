@@ -4,7 +4,7 @@
 
 API REST para gestionar **incidencias (tickets) de soporte técnico**, al estilo del servicio de soporte de una administración pública. Los empleados abren incidencias y siguen su estado; el equipo técnico las asigna, las comenta y las resuelve.
 
-**Stack:** Java 21 · Spring Boot 3.5 · Spring Data JPA (Hibernate) · PostgreSQL · Flyway · Spring Security + JWT · Bean Validation · springdoc-openapi (Swagger) · JUnit 5 · Mockito · Maven · Docker Compose
+**Stack:** Java 21 · Spring Boot 3.5 · Spring Data JPA (Hibernate) · PostgreSQL y Oracle · Flyway · Spring Security + JWT · Bean Validation · springdoc-openapi (Swagger) · JUnit 5 · Mockito · Testcontainers · Maven · Docker Compose
 
 ![Swagger UI](docs/swagger-ui.png)
 
@@ -28,7 +28,8 @@ API REST para gestionar **incidencias (tickets) de soporte técnico**, al estilo
 - **Comentarios** en cada incidencia (no se admiten en las cerradas).
 - **Validación** de las peticiones y **gestión global de errores** con códigos HTTP correctos y formato estándar *Problem Details* (RFC 9457).
 - **Documentación OpenAPI** interactiva en Swagger UI.
-- **Docker Compose**: API + PostgreSQL con un solo comando y datos de ejemplo.
+- **Funciona con PostgreSQL y con Oracle** sin cambiar el código: se elige con un perfil de Spring.
+- **Docker Compose**: API + base de datos (PostgreSQL u Oracle) con un solo comando y datos de ejemplo.
 
 ## Arquitectura
 
@@ -44,11 +45,12 @@ src/main/java/com/hanzlaarif/incidencias
 ├── security/       Filtro JWT, generación y validación de tokens, respuestas 401/403
 ├── exception/      Excepciones de negocio y @RestControllerAdvice global
 └── config/         Spring Security, OpenAPI y datos de demostración
-src/main/resources/db/migration   Migraciones Flyway (esquema versionado)
+src/main/resources/db/migration   Migraciones Flyway para PostgreSQL (y H2 en los tests)
+src/main/resources/db/oracle      Migraciones Flyway para Oracle (perfil "oracle")
 ```
 
 ```
-Cliente ──HTTP──► JwtAuthenticationFilter ──► Controller ──► Service ──► Repository ──► PostgreSQL
+Cliente ──HTTP──► JwtAuthenticationFilter ──► Controller ──► Service ──► Repository ──► PostgreSQL / Oracle
                   (valida el token y carga      (DTO +         (reglas,     (JPA/Hibernate)
                    el usuario y su rol)          @PreAuthorize) permisos)
 ```
@@ -62,7 +64,7 @@ incidencias 1 ── * comentarios (borrado en cascada)
 usuarios 1 ──── * comentarios (autor_id)
 ```
 
-- El esquema lo crea **Flyway** (`V1__esquema_inicial.sql`) con claves foráneas, restricciones `CHECK` para los enums, email único e índices. Hibernate solo lo **valida** (`ddl-auto: validate`).
+- El esquema lo crea **Flyway** (`V1__esquema_inicial.sql`, una versión por base de datos) con claves foráneas, restricciones `CHECK` para los enums, email único e índices. Hibernate solo lo **valida** (`ddl-auto: validate`).
 - Las relaciones `@ManyToOne` son `LAZY`, y los listados cargan creador y técnico con `@EntityGraph` en una sola consulta para **evitar el problema N+1**.
 - `open-in-view` está desactivado: todo el acceso a datos ocurre dentro de las transacciones del servicio.
 
@@ -90,6 +92,22 @@ Con el perfil `demo` (activo por defecto en `docker-compose.yml`) se cargan dato
 | USUARIO | `pere@demo.local` | `Usuario123!` |
 
 Los valores por defecto (usuario y contraseña de la base de datos, clave JWT) son **solo para desarrollo**. Para cambiarlos, copia `.env.example` como `.env`.
+
+### Con Oracle
+
+La misma aplicación con **Oracle Database 23ai Free** en lugar de PostgreSQL:
+
+```bash
+docker compose -f docker-compose.oracle.yml up --build
+```
+
+La primera vez descarga la imagen de Oracle (unos 6,5 GB una vez descomprimida), así que tarda varios minutos; luego Oracle arranca en unos segundos. Los usuarios de demo son los mismos.
+
+Qué cambia al activar el perfil `oracle` (`application-oracle.yml`):
+
+- La URL JDBC (`jdbc:oracle:thin:@//host:1521/FREEPDB1`); el driver y el dialecto de Hibernate se detectan solos.
+- Flyway usa las migraciones de `db/oracle`, con los tipos propios de Oracle: `NUMBER(19)` en lugar de `BIGINT` y `VARCHAR2(n CHAR)` en lugar de `VARCHAR(n)`.
+- El código Java (entidades, consultas con Specifications, paginación) es exactamente el mismo.
 
 ### Sin Docker
 
@@ -201,7 +219,7 @@ Formato de error (`application/problem+json`):
 .\mvnw.cmd test      # Windows
 ```
 
-**69 tests** (JUnit 5), todos en verde:
+**93 tests** (JUnit 5), todos en verde:
 
 | Tipo | Clases | Qué prueban |
 |---|---|---|
@@ -209,9 +227,10 @@ Formato de error (`application/problem+json`):
 | Unitarios con **Mockito** | `IncidenciaServiceTest`, `AuthServiceTest` | Permisos por rol y propietario, reglas de negocio y registro/login, con los repositorios simulados |
 | Unitarios de seguridad | `JwtServiceTest` | Token válido, caducado (con un `Clock` fijo), firmado con otra clave y manipulado |
 | Repositorio (`@DataJpaTest`) | `IncidenciaRepositoryTest` | Filtros dinámicos con Specifications, paginación y ordenación contra una base de datos real |
-| **Integración** (`@SpringBootTest` + MockMvc) | `AuthIntegrationTest`, `IncidenciaIntegrationTest` | Peticiones HTTP completas con seguridad, validación, JPA y Flyway: códigos 200/201/204/400/401/403/404/409, visibilidad por rol, ciclo de vida completo, comentarios |
+| **Integración** (`@SpringBootTest` + MockMvc) | `AuthIntegrationTest`, `IncidenciaIntegrationTest` | Peticiones HTTP completas con seguridad, validación, JPA y Flyway: códigos 200/201/204/400/401/403/404/409, visibilidad por rol, ciclo de vida completo, comentarios, textos largos con caracteres multibyte |
+| **Integración con Oracle** (**Testcontainers**) | `IncidenciaOracleIntegrationTest` | Los mismos 21 tests de `IncidenciaIntegrationTest`, ejecutados contra un **Oracle Database Free real** en Docker con el perfil `oracle` |
 
-Los tests de integración usan **H2 en memoria en modo PostgreSQL** y ejecutan las mismas migraciones Flyway que producción, así que no necesitan Docker. GitHub Actions ejecuta todos los tests en cada *push*.
+Los tests de integración normales usan **H2 en memoria en modo PostgreSQL** y ejecutan las mismas migraciones Flyway que producción. Los de Oracle levantan un contenedor con Testcontainers; si no hay Docker disponible se omiten en lugar de fallar. GitHub Actions ejecuta todos los tests, incluidos los de Oracle, en cada *push*.
 
 > En Windows con Git Bash, `./mvnw` puede fallar al descargar Maven porque Git Bash incluye una versión antigua de `wget`. Usa `mvnw.cmd` desde PowerShell o CMD.
 
@@ -225,11 +244,12 @@ Los tests de integración usan **H2 en memoria en modo PostgreSQL** y ejecutan l
 - **Specifications** para los filtros: una sola consulta para cualquier combinación de filtros, sin un método de repositorio por combinación.
 - **Login con el mismo mensaje** tanto si el email no existe como si la contraseña es incorrecta, para no revelar qué cuentas existen.
 - **Spring Boot 3.5** (en lugar de 4.x) por madurez, documentación y compatibilidad directa con JUnit 5.
+- **PostgreSQL y Oracle con el mismo código**: JPA abstrae las diferencias de SQL en las consultas, y las del esquema (tipos de columna) se resuelven con una carpeta de migraciones por base de datos, elegida con un perfil de Spring.
+- **Descripción y comentarios limitados a 1000 caracteres.** En Oracle un `VARCHAR2` no puede superar 4000 bytes, y en UTF-8 un carácter ocupa hasta 4 bytes: con 1000 caracteres el texto cabe siempre. Lo detectó una prueba con Oracle real (`ORA-12899` con 4000 "ñ") y lo cubren los tests. Para textos más largos, la alternativa sería un `CLOB`.
 
 ## Posibles mejoras
 
-- Tests de integración con **Testcontainers** sobre PostgreSQL real.
+- Tests de integración con Testcontainers también sobre PostgreSQL (ahora se usa H2 en modo PostgreSQL).
 - *Refresh tokens* y revocación de tokens.
 - Gestión de usuarios y técnicos por parte de un rol administrador.
 - Historial de cambios de estado (auditoría) y notificaciones por email.
-- Perfil para **Oracle** (la capa JPA y las migraciones son SQL estándar).
