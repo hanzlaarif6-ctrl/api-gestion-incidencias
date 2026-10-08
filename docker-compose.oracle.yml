@@ -1,0 +1,40 @@
+# Variante con Oracle Database 23ai Free en lugar de PostgreSQL:
+#   docker compose -f docker-compose.oracle.yml up --build
+# La primera vez descarga la imagen de Oracle (más de 1 GB) y tarda algo más en arrancar.
+services:
+  oracle:
+    # Imagen de Oracle Database Free mantenida por Gerald Venzl (Oracle), la misma que usa Testcontainers
+    image: gvenzl/oracle-free:23-slim-faststart
+    environment:
+      ORACLE_PASSWORD: ${ORACLE_PASSWORD:-oracle}   # contraseña de SYS/SYSTEM, solo para desarrollo
+      APP_USER: ${DB_USUARIO:-incidencias}          # la imagen crea este usuario/esquema en FREEPDB1
+      APP_USER_PASSWORD: ${DB_PASSWORD:-incidencias}
+    ports:
+      - "1521:1521"
+    volumes:
+      - datos-oracle:/opt/oracle/oradata
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  api:
+    build: .
+    depends_on:
+      oracle:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:oracle:thin:@//oracle:1521/FREEPDB1
+      DB_USUARIO: ${DB_USUARIO:-incidencias}
+      DB_PASSWORD: ${DB_PASSWORD:-incidencias}
+      # Clave solo para desarrollo: en cualquier otro entorno se define en .env
+      JWT_SECRETO: ${JWT_SECRETO:-S8b6RBwcXii4AA+75YFGCWW8jiNAGKEZztrTaUVLpiQ=}
+      JWT_EXPIRACION_MINUTOS: ${JWT_EXPIRACION_MINUTOS:-60}
+      SPRING_PROFILES_ACTIVE: oracle,demo
+    ports:
+      - "8080:8080"
+
+volumes:
+  datos-oracle:
